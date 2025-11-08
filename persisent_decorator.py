@@ -1,3 +1,4 @@
+import functools
 import pickle
 from typing_extensions import Any, Callable, TypeVar, ParamSpec
 import inspect
@@ -7,9 +8,8 @@ from typing import Tuple
 _R = TypeVar("_R")
 _P = ParamSpec("_P")
 
-def _build_key(
-    func: Callable[_P, _R], *args, **kwargs
-) -> Tuple[Tuple[str, Any], ...]:
+
+def _build_key(func: Callable[_P, _R], *args, **kwargs) -> Tuple[Tuple[str, Any], ...]:
     spec = inspect.getfullargspec(func)
     arg_pairs = list(zip(spec.args, args))
     for pair in kwargs.items():
@@ -18,14 +18,14 @@ def _build_key(
     return key
 
 
-def persistent_cache(out_func: Callable[_P, _R] = None, output: Path | None = None):
-    def dec(func):
+def persistent_cache(outer_func: Callable[_P, _R] = None, output: Path | None = None):
+    def dec(func: Callable[_P, _R]):
         out_file = output if output else Path(f"{func.__name__}.pkl")
         cache = {}
         if out_file.exists():
             with out_file.open("rb") as f:
                 cache = pickle.load(f)
-
+        @functools.wraps(func)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs):
             key = _build_key(func, *args, **kwargs)
             print(key)
@@ -38,7 +38,7 @@ def persistent_cache(out_func: Callable[_P, _R] = None, output: Path | None = No
 
         return wrapped
 
-    return dec(out_func) if out_func else dec
+    return dec(outer_func) if outer_func else dec
 
 
 @persistent_cache
